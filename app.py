@@ -1,7 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import numpy as py
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -18,19 +18,68 @@ period = st.selectbox("Time Period", ["6mo", "1y", "2y", "5y"], index=1)
 
 if st.button("Analyze Portfolio", use_container_width=True):
     if tickers_input and amounts_input:
-        tickers = [t.strip().upper() for t in tickers_input.split(" ,")]
-        amounts = [float(a.strip()) for a in amounts_input.split(" ,")]
+        tickers = [t.strip().upper() for t in tickers_input.split(",")]
+        amounts = [float(a.strip()) for a in amounts_input.split(",")]
     
-    if len(tickers) != len(amounts):
-        st.error("Number of tickers and amounts must match.")
-    else:
-        st.success(f"Analyzing {tickers}")
-
-        data = yf.download(tickers, period=period)["Close"]
-        if data.empty:
-            st.error("Could not fetch the data, check your ticker symbols.")
+        if len(tickers) != len(amounts):
+            st.error("Number of tickers and amounts must match.")
         else:
-            st.markdown("### Price History")
-            st.line_chart(data)
-else:
-    st.warning("Please enter both tickers and amounts.")
+            st.success(f"Analyzing {tickers}")
+
+            data = yf.download(tickers, period=period)["Close"]
+            if isinstance(data, pd.Series):
+                data = data.to_frame(name=tickers[0])
+            if data.empty:
+                st.error("Could not fetch the data, check your ticker symbols.")
+            else:
+                st.markdown("### Price History")
+                st.line_chart(data)
+                st.markdown("### Volatility Analysis")
+                returns = data.pct_change().dropna()
+                volatility = returns.std() * np.sqrt(252)
+
+                vol_df = pd.DataFrame({
+                    "Ticker": volatility.index,
+                    "Annual Volatility": (volatility.values * 100).round(2)
+                })
+
+                fig_vol = px.bar(vol_df, x="Ticker", y="Annual Volatility", title="Annualized Volatility %", color="Annual Volatility", color_continuous_scale="RdYlGn_r")
+                st.plotly_chart(fig_vol, use_container_width=True)
+
+                st.markdown("### Sharpe Ratio")
+                risk_free_rate = 0.05 / 252
+                sharpe_ratios = (returns.mean() - risk_free_rate) / returns.std()
+
+                sharpe_df = pd.DataFrame({
+                    "Ticker": sharpe_ratios.index,
+                    "Sharpe Ratio": sharpe_ratios.values.round(2)
+                })
+
+                fig_sharpe = px.bar(sharpe_df, x="Ticker", y="Sharpe Ratio", title="Sharpe Ratio by the Stock", color="Sharpe Ratio", color_continuous_scale="RdYlGn")
+                st.plotly_chart(fig_sharpe, use_container_width=True)
+                st.caption("Sharpe Ratio > 1 is pretty good, > 2 is great, and < 0 means the stock lost money relative to vulnerability.")
+
+                st.markdown("### Max Drawdown")
+                def max_drawdown(series):
+                    roll_max = series.cummax()
+                    drawdown = (series - roll_max) / roll_max
+                    return drawdown.min()
+                
+                drawdowns = {ticker: max_drawdown(data[ticker]) for ticker in tickers}
+                drawdown_df = pd.DataFrame({
+                    "Ticker": list(drawdowns.keys()),
+                    "Max Drawdown in %": [round(v * 100,2) for v in drawdowns.values()]
+                })
+    
+                fig_dd = px.bar(drawdown_df, x="Ticker", y="Max Drawdown in %", title="Max Drawdown by Stock", color="Max Drawdown in %", color_continuous_scale="RdYlGn")
+                st.plotly_chart(fig_dd, use_container_width=True)
+                st.caption("Max Drawdown shows the worst peak-to-trough drop. Closer to 0 would be better")
+
+                st.markdown("### Correlation Heatmap")
+                corr = returns.corr()
+                fig_corr = px.imshow(corr, text_auto=True, color_continuous_scale="RdYlGn", title="Stock Correlation Matrix")
+                st.plotly_chart(fig_corr, use_container_width=True)
+                st.caption("Correlation close to 1 means stocks move together, while close to -1 means they move opposite. Lower correlation yields better diversification of stocks.")
+                
+    else:
+        st.warning("Please enter both tickers and amounts.")
