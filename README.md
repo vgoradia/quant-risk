@@ -1,6 +1,6 @@
 # 📈 QuantRisk
 
-A web-based portfolio risk analysis tool that helps everyday investors understand their risk exposure using the same statistical methods used by professional fund managers — built with Python, Pandas, NumPy, Plotly, Streamlit, and Claude AI.
+A web-based portfolio risk analysis tool that helps everyday investors understand their risk exposure using the same statistical methods used by professional fund managers — built with Python, Pandas, NumPy, Plotly, Streamlit, and Claude API.
 
 🔗 **Project Link:** https://finance-risk-analyzer.streamlit.app/
 
